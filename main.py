@@ -9,17 +9,13 @@ import json
 import requests
 import pandas as pd
 from datetime import datetime, timedelta
-import tushare as ts
+import akshare as ak
 from openai import OpenAI
 
 # 配置信息
-TUSHARE_TOKEN = os.environ.get('TUSHARE_TOKEN')
 LLM_API_KEY = os.environ.get('LLM_API_KEY')
 FEISHU_WEBHOOK = os.environ.get('FEISHU_WEBHOOK')
 STOCK_POOL = os.environ.get('STOCK_POOL', '002821')
-
-# 初始化 Tushare
-pro = ts.pro_api(TUSHARE_TOKEN)
 
 # 初始化通义千问客户端
 client = OpenAI(
@@ -28,47 +24,74 @@ client = OpenAI(
 )
 
 
-def get_stock_basic_info(ts_code):
+def get_stock_basic_info(stock_code):
     """获取股票基本信息"""
     try:
-        df = pro.stock_basic(ts_code=ts_code, fields='ts_code,name,industry,area')
+        df = ak.stock_individual_info_em(symbol=stock_code)
         if df is not None and not df.empty:
-            return df.iloc[0].to_dict()
+            info = {}
+            for _, row in df.iterrows():
+                info[row['item']] = row['value']
+            return {
+                'ts_code': stock_code,
+                'name': info.get('股票简称', ''),
+                'industry': info.get('所属行业', ''),
+                'area': info.get('所属地域', '')
+            }
         return None
     except Exception as e:
-        print(f"获取股票基本信息失败 {ts_code}: {e}")
+        print(f"获取股票基本信息失败 {stock_code}: {e}")
         return None
 
 
-def get_daily_data(ts_code):
+def get_daily_data(stock_code):
     """获取日线数据"""
     try:
-        end_date = datetime.now().strftime('%Y%m%d')
-        start_date = (datetime.now() - timedelta(days=30)).strftime('%Y%m%d')
-        df = pro.daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
-        return df if df is not None and not df.empty else None
+        df = ak.stock_zh_a_hist(symbol=stock_code, period="daily", 
+                                start_date=(datetime.now() - timedelta(days=60)).strftime('%Y%m%d'),
+                                end_date=datetime.now().strftime('%Y%m%d'), adjust="qfq")
+        if df is not None and not df.empty:
+            # 重命名列以兼容原有代码
+            df = df.rename(columns={
+                '日期': 'trade_date',
+                '开盘': 'open',
+                '收盘': 'close',
+                '最高': 'high',
+                '最低': 'low',
+                '成交量': 'vol',
+                '涨跌幅': 'pct_chg'
+            })
+            df['trade_date'] = pd.to_datetime(df['trade_date']).dt.strftime('%Y%m%d')
+            return df
+        return None
     except Exception as e:
-        print(f"获取日线数据失败 {ts_code}: {e}")
+        print(f"获取日线数据失败 {stock_code}: {e}")
         return None
 
 
 def get_index_data():
     """获取大盘指数数据"""
     try:
-        end_date = datetime.now().strftime('%Y%m%d')
-        start_date = (datetime.now() - timedelta(days=5)).strftime('%Y%m%d')
-        
         # 上证指数
-        sh_df = pro.index_daily(ts_code='000001.SH', start_date=start_date, end_date=end_date)
+        sh_df = ak.index_zh_a_hist(symbol="000001", period="daily")
         # 深证成指
-        sz_df = pro.index_daily(ts_code='399001.SZ', start_date=start_date, end_date=end_date)
+        sz_df = ak.index_zh_a_hist(symbol="399001", period="daily")
         # 创业板指
-        cy_df = pro.index_daily(ts_code='399006.SZ', start_date=start_date, end_date=end_date)
+        cy_df = ak.index_zh_a_hist(symbol="399006", period="daily")
+        
+        def get_latest(df):
+            if df is not None and not df.empty:
+                latest = df.iloc[-1]
+                return {
+                    'close': latest['收盘'],
+                    'pct_chg': latest['涨跌幅']
+                }
+            return None
         
         return {
-            'sh': sh_df.iloc[0].to_dict() if sh_df is not None and not sh_df.empty else None,
-            'sz': sz_df.iloc[0].to_dict() if sz_df is not None and not sz_df.empty else None,
-            'cy': cy_df.iloc[0].to_dict() if cy_df is not None and not cy_df.empty else None
+            'sh': get_latest(sh_df),
+            'sz': get_latest(sz_df),
+            'cy': get_latest(cy_df)
         }
     except Exception as e:
         print(f"获取指数数据失败: {e}")
