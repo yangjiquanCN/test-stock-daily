@@ -29,19 +29,33 @@ def get_stock_basic_info(stock_code):
     try:
         df = ak.stock_individual_info_em(symbol=stock_code)
         if df is not None and not df.empty:
+            # 处理 DataFrame 格式
             info = {}
-            for _, row in df.iterrows():
-                info[row['item']] = row['value']
+            if isinstance(df, pd.DataFrame):
+                for _, row in df.iterrows():
+                    if 'item' in df.columns and 'value' in df.columns:
+                        info[row['item']] = row['value']
+                    else:
+                        info[str(_)] = row.iloc[-1] if hasattr(row, 'iloc') else row
+            else:
+                info = df.to_dict() if hasattr(df, 'to_dict') else {}
+            
             return {
                 'ts_code': stock_code,
-                'name': info.get('股票简称', ''),
-                'industry': info.get('所属行业', ''),
-                'area': info.get('所属地域', '')
+                'name': info.get('股票简称', info.get('股票名称', f'股票{stock_code}')),
+                'industry': info.get('所属行业', '未知'),
+                'area': info.get('所属地域', '未知')
             }
         return None
     except Exception as e:
         print(f"获取股票基本信息失败 {stock_code}: {e}")
-        return None
+        # 返回默认信息
+        return {
+            'ts_code': stock_code,
+            'name': f'股票{stock_code}',
+            'industry': '未知',
+            'area': '未知'
+        }
 
 
 def get_daily_data(stock_code):
@@ -50,7 +64,7 @@ def get_daily_data(stock_code):
         df = ak.stock_zh_a_hist(symbol=stock_code, period="daily", 
                                 start_date=(datetime.now() - timedelta(days=60)).strftime('%Y%m%d'),
                                 end_date=datetime.now().strftime('%Y%m%d'), adjust="qfq")
-        if df is not None and not df.empty:
+        if df is not None and not df.empty and len(df) > 0:
             # 重命名列以兼容原有代码
             df = df.rename(columns={
                 '日期': 'trade_date',
