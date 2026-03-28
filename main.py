@@ -328,7 +328,7 @@ def main():
     print("=" * 50)
     
     # 检查环境变量
-    if not all([TUSHARE_TOKEN, LLM_API_KEY, FEISHU_WEBHOOK]):
+    if not all([LLM_API_KEY, FEISHU_WEBHOOK]):
         print("错误: 缺少必要的环境变量配置")
         return
     
