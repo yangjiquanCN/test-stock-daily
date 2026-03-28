@@ -3,7 +3,6 @@
 每日股票分析工具
 使用 Tushare 获取数据，通义千问生成分析报告，飞书推送
 """
-
 import os
 import json
 import requests
@@ -11,19 +10,15 @@ import pandas as pd
 from datetime import datetime, timedelta
 import akshare as ak
 from openai import OpenAI
-
 # 配置信息
 LLM_API_KEY = os.environ.get('LLM_API_KEY')
 FEISHU_WEBHOOK = os.environ.get('FEISHU_WEBHOOK')
 STOCK_POOL = os.environ.get('STOCK_POOL', '002821')
-
 # 初始化通义千问客户端
 client = OpenAI(
     api_key=LLM_API_KEY,
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
 )
-
-
 def get_stock_basic_info(stock_code):
     """获取股票基本信息"""
     try:
@@ -56,8 +51,6 @@ def get_stock_basic_info(stock_code):
             'industry': '未知',
             'area': '未知'
         }
-
-
 def get_daily_data(stock_code):
     """获取日线数据"""
     try:
@@ -81,8 +74,6 @@ def get_daily_data(stock_code):
     except Exception as e:
         print(f"获取日线数据失败 {stock_code}: {e}")
         return None
-
-
 def get_index_data():
     """获取大盘指数数据"""
     try:
@@ -110,8 +101,6 @@ def get_index_data():
     except Exception as e:
         print(f"获取指数数据失败: {e}")
         return None
-
-
 def calculate_technical_indicators(df):
     """计算技术指标"""
     if df is None or df.empty:
@@ -149,8 +138,6 @@ def calculate_technical_indicators(df):
         'histogram': round(latest['histogram'], 4),
         'trend': '上涨' if latest['close'] > prev['close'] else '下跌'
     }
-
-
 def generate_analysis_prompt(stock_info, tech_data, index_data, is_pre_market=True):
     """生成 AI 分析提示词"""
     
@@ -170,15 +157,12 @@ def generate_analysis_prompt(stock_info, tech_data, index_data, is_pre_market=Tr
             index_info += f"创业板指: {cy['close']} ({cy['pct_chg']:.2f}%)\n"
     
     prompt = f"""你是一位专业的股票分析师，请为以下股票生成{market_type}报告。
-
 **分析日期**: {current_time}
-
 **股票信息**:
 - 股票代码: {stock_info['ts_code']}
 - 股票名称: {stock_info['name']}
 - 所属行业: {stock_info.get('industry', '未知')}
 - 所属地区: {stock_info.get('area', '未知')}
-
 **最新行情数据**:
 - 收盘价: {tech_data['close']} 元
 - 开盘价: {tech_data['open']} 元
@@ -187,7 +171,6 @@ def generate_analysis_prompt(stock_info, tech_data, index_data, is_pre_market=Tr
 - 成交量: {tech_data['vol']} 万手
 - 涨跌幅: {tech_data['pct_chg']}%
 - 趋势: {tech_data['trend']}
-
 **技术指标**:
 - MA5: {tech_data['ma5']} 元
 - MA10: {tech_data['ma10']} 元
@@ -195,23 +178,18 @@ def generate_analysis_prompt(stock_info, tech_data, index_data, is_pre_market=Tr
 - MACD: {tech_data['macd']}
 - Signal: {tech_data['signal']}
 - Histogram: {tech_data['histogram']}
-
 **大盘指数**:
 {index_info}
-
 请生成一份专业的{market_type}报告，包含以下内容：
 1. 技术面分析（基于均线、MACD等指标）
 2. 趋势判断
 3. 操作建议（仅供参考，不构成投资建议）
-
 要求：
 - 语言简洁专业
 - 突出重点
 - 字数控制在300字以内
 """
     return prompt
-
-
 def get_ai_analysis(prompt):
     """调用通义千问生成分析"""
     try:
@@ -228,8 +206,6 @@ def get_ai_analysis(prompt):
     except Exception as e:
         print(f"AI 分析失败: {e}")
         return "AI 分析暂时不可用，请查看原始数据。"
-
-
 def send_feishu_report(title, content):
     """发送飞书报告"""
     try:
@@ -284,8 +260,6 @@ def send_feishu_report(title, content):
     except Exception as e:
         print(f"发送飞书消息失败: {e}")
         return False
-
-
 def analyze_stock(stock_code, is_pre_market=True):
     """分析单只股票"""
     print(f"\n正在分析股票: {stock_code}")
@@ -316,24 +290,19 @@ def analyze_stock(stock_code, is_pre_market=True):
     title = f"📊 【每日股票{market_type}】{stock_info['name']}({stock_code})"
     
     content = f"""**股票**: {stock_info['name']} ({stock_code}) | {stock_info.get('industry', '未知')}
-
 **最新行情**:
 • 收盘价: **{tech_data['close']}** 元
 • 涨跌幅: **{tech_data['pct_chg']}%**
 • 成交量: {tech_data['vol']} 万手
 • 最高/最低: {tech_data['high']} / {tech_data['low']} 元
-
 **技术指标**:
 • MA5/MA10/MA20: {tech_data['ma5']} / {tech_data['ma10']} / {tech_data['ma20']}
 • MACD: {tech_data['macd']}
-
 **AI 分析**:
 {analysis}
 """
     
     return title, content
-
-
 def main():
     """主函数"""
     print("=" * 50)
@@ -371,7 +340,5 @@ def main():
             print(f"分析股票 {stock_code} 时出错: {e}")
     
     print("\n分析完成!")
-
-
 if __name__ == '__main__':
     main()
